@@ -75,7 +75,8 @@ const playerCovIdx  = {};
 const observers     = {};  
 const playerConsole = {};
 const playerGenre   = {};
-const playerCovGen  = {};
+const playerRebuildGen = {};
+let hideDLC = false;
 
 function fetchGvizJSONP(gid) {
   return new Promise((resolve, reject) => {
@@ -414,8 +415,9 @@ function getFilteredGames(key) {
   const cons  = playerConsole[key] || 'all';
   const genre = playerGenre[key]   || 'all';
   let games = player.games;
-  if (cons  !== 'all') games = games.filter(g => g.console === cons);
-  if (genre !== 'all') games = games.filter(g => g.genre === genre);
+  if (cons    !== 'all') games = games.filter(g => g.console === cons);
+  if (genre   !== 'all') games = games.filter(g => g.genre === genre);
+  if (hideDLC)           games = games.filter(g => !/dlc/i.test(g.type) && !/dlc/i.test(g.genre));
   return sortGames(games, currentSort);
 }
 
@@ -523,6 +525,7 @@ function renderSortBar(key) {
       <div class="sort-options">
         <select class="console-filter" data-player="${key}">${conOpts}</select>
         <select class="genre-filter"   data-player="${key}">${genOpts}</select>
+        <button class="sort-btn dlc-toggle ${hideDLC ? 'active' : ''}" id="dlc-toggle-${key}">DLC</button>
         <button class="sort-btn ${currentSort === 'date'  ? 'active' : ''}" data-sort="date">Data</button>
         <button class="sort-btn ${currentSort === 'score' ? 'active' : ''}" data-sort="score">Nota</button>
         <button class="sort-btn ${currentSort === 'name'  ? 'active' : ''}" data-sort="name">Nome</button>
@@ -570,7 +573,11 @@ function buildSections() {
   const container = document.getElementById('player-sections');
   container.innerHTML = '';
 
-  playerOrder.forEach(key => { playerPages[key] = 0; playerCovIdx[key] = 0; });
+  playerOrder.forEach(key => {
+    playerPages[key]      = 0;
+    playerCovIdx[key]     = 0;
+    playerRebuildGen[key] = (playerRebuildGen[key] || 0) + 1;
+  });
 
   playerOrder.forEach(key => {
     const player   = PLAYERS[key];
@@ -616,13 +623,13 @@ function makePlaceholder(name) {
   return div;
 }
 
-async function loadCoversFrom(key, from, to, gen) {
+async function loadCoversFrom(key, from, to, rebuildGen) {
   const player = PLAYERS[key];
   if (!player) return;
   const sorted = getFilteredGames(key);
 
   for (let i = from; i < Math.min(to, sorted.length); i++) {
-    if (playerCovGen[key] !== gen) return; // loop cancelado por chamada mais recente
+    if ((playerRebuildGen[key] || 0) !== rebuildGen) return;
     const game   = sorted[i];
     const cardId = `card-${game.name.replace(/\W/g, '_')}`;
     const target = document.getElementById(`cov-${cardId}`);
@@ -666,9 +673,7 @@ function loadPendingCovers(key) {
   const to   = playerPages[key]  || 0;
   if (from < to) {
     playerCovIdx[key] = to;
-    const gen = (playerCovGen[key] || 0) + 1;
-    playerCovGen[key] = gen;
-    loadCoversFrom(key, from, to, gen);
+    loadCoversFrom(key, from, to, playerRebuildGen[key] || 0);
   }
 }
 
@@ -795,6 +800,12 @@ function bindSortButtons() {
   document.querySelectorAll('.genre-filter').forEach(sel => {
     sel.addEventListener('change', () => {
       playerGenre[sel.dataset.player] = sel.value;
+      buildSections();
+    });
+  });
+  document.querySelectorAll('.dlc-toggle').forEach(btn => {
+    btn.addEventListener('click', () => {
+      hideDLC = !hideDLC;
       buildSections();
     });
   });
