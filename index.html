@@ -64,9 +64,10 @@ let currentSort   = 'date';
 const coverCache  = JSON.parse(localStorage.getItem('cover_cache') || '{}');
 
 const PAGE_SIZE     = 10;
-const playerPages   = {};  // quantos cards já foram renderizados por player
-const playerCovIdx  = {};  // até qual índice as covers já foram requisitadas
-const observers     = {};  // IntersectionObserver por player
+const playerPages   = {};  
+const playerCovIdx  = {};  
+const observers     = {};  
+const playerConsole = {};  
 
 function fetchGvizJSONP(gid) {
   return new Promise((resolve, reject) => {
@@ -385,6 +386,18 @@ function smartDate(d) {
   return new Date(y, month - 1, day);
 }
 
+function getFilteredGames(key) {
+  const player = PLAYERS[key];
+  if (!player) return [];
+  const cons = playerConsole[key] || 'all';
+  const games = cons === 'all' ? player.games : player.games.filter(g => g.console === cons);
+  return sortGames(games, currentSort);
+}
+
+function getPlayerConsoles(games) {
+  return [...new Set(games.map(g => g.console).filter(Boolean))].sort();
+}
+
 function sortGames(games, by) {
   const copy = [...games];
   if (by === 'score') return copy.sort((a, b) => b.score - a.score);
@@ -462,11 +475,19 @@ function renderStats(games, player) {
     </div>`;
 }
 
-function renderSortBar() {
+function renderSortBar(key) {
+  const player   = PLAYERS[key];
+  const consoles = getPlayerConsoles(player.games);
+  const selected = playerConsole[key] || 'all';
+  const options  = ['all', ...consoles].map(c =>
+    `<option value="${esc(c)}" ${selected === c ? 'selected' : ''}>${c === 'all' ? 'Todos' : esc(c)}</option>`
+  ).join('');
+
   return `
     <div class="sort-bar">
       <span>* apenas jogos com tempo registrado</span>
       <div class="sort-options">
+        <select class="console-filter" data-player="${key}">${options}</select>
         <button class="sort-btn ${currentSort === 'date'  ? 'active' : ''}" data-sort="date">Data</button>
         <button class="sort-btn ${currentSort === 'score' ? 'active' : ''}" data-sort="score">Nota</button>
         <button class="sort-btn ${currentSort === 'name'  ? 'active' : ''}" data-sort="name">Nome</button>
@@ -517,9 +538,9 @@ function buildSections() {
   playerOrder.forEach(key => { playerPages[key] = 0; playerCovIdx[key] = 0; });
 
   playerOrder.forEach(key => {
-    const player = PLAYERS[key];
-    const sorted = sortGames(player.games, currentSort);
-    const section = document.createElement('div');
+    const player   = PLAYERS[key];
+    const filtered = getFilteredGames(key);
+    const section  = document.createElement('div');
     section.className = `player-section ${key === currentPlayer ? 'active' : ''}`;
     section.id = `section-${key}`;
 
@@ -528,12 +549,18 @@ function buildSections() {
         ${renderStats([], player)}
         <div class="grid"><div class="empty"><div class="empty-icon">🎮</div>
         <p>Nenhum jogo cadastrado ainda na planilha.</p></div></div>`;
-    } else {
-      const firstBatch = sorted.slice(0, PAGE_SIZE);
-      playerPages[key] = Math.min(PAGE_SIZE, sorted.length);
+    } else if (filtered.length === 0) {
       section.innerHTML = `
         ${renderStats(player.games, player)}
-        ${renderSortBar()}
+        ${renderSortBar(key)}
+        <div class="grid"><div class="empty"><div class="empty-icon">🎮</div>
+        <p>Nenhum jogo encontrado para este console.</p></div></div>`;
+    } else {
+      const firstBatch = filtered.slice(0, PAGE_SIZE);
+      playerPages[key] = Math.min(PAGE_SIZE, filtered.length);
+      section.innerHTML = `
+        ${renderStats(player.games, player)}
+        ${renderSortBar(key)}
         <div class="grid" id="grid-${key}">${firstBatch.map(g => renderCard(g, player.color)).join('')}</div>
         <div class="sentinel" id="sentinel-${key}"></div>`;
     }
@@ -557,7 +584,7 @@ function makePlaceholder(name) {
 async function loadCoversFrom(key, from, to) {
   const player = PLAYERS[key];
   if (!player) return;
-  const sorted = sortGames(player.games, currentSort);
+  const sorted = getFilteredGames(key);
 
   for (let i = from; i < Math.min(to, sorted.length); i++) {
     const game   = sorted[i];
@@ -617,7 +644,7 @@ function disconnectObserver(key) {
 function loadMoreCards(key) {
   const player = PLAYERS[key];
   if (!player) return;
-  const sorted = sortGames(player.games, currentSort);
+  const sorted = getFilteredGames(key);
   const from   = playerPages[key] || 0;
   if (from >= sorted.length) { disconnectObserver(key); return; }
 
@@ -654,6 +681,12 @@ function bindSortButtons() {
   document.querySelectorAll('.sort-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       currentSort = btn.dataset.sort;
+      buildSections();
+    });
+  });
+  document.querySelectorAll('.console-filter').forEach(sel => {
+    sel.addEventListener('change', () => {
+      playerConsole[sel.dataset.player] = sel.value;
       buildSections();
     });
   });

@@ -491,6 +491,36 @@
         color: var(--text);
     }
 
+    .console-filter {
+        padding: 5px 28px 5px 12px;
+        background: transparent;
+        border: 1px solid var(--border);
+        border-radius: 20px;
+        color: var(--muted);
+        font-size: .75rem;
+        cursor: pointer;
+        transition: all .2s;
+        letter-spacing: .5px;
+        appearance: none;
+        -webkit-appearance: none;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%236b6b90'/%3E%3C/svg%3E");
+        background-repeat: no-repeat;
+        background-position: right 10px center;
+        font-family: inherit;
+    }
+
+    .console-filter:hover,
+    .console-filter:focus {
+        border-color: var(--text);
+        color: var(--text);
+        outline: none;
+    }
+
+    .console-filter option {
+        background: #0f0f1a;
+        color: var(--text);
+    }
+
     .empty {
         grid-column: 1/-1;
         text-align: center;
