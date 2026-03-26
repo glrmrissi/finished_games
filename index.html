@@ -1,0 +1,645 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Jogos Zerados</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;600;700&family=Orbitron:wght@400;700;900&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles/style.css">
+  <link rel="shortcut icon" href="assets/caba.png" type="image/x-icon">
+</head>
+<body>
+
+<div id="lock-screen">
+  <div class="lock-box">
+    <h2 class="lock-title">Jogos Zerados</h2>
+    <p class="lock-sub">Digite a senha para continuar</p>
+    <div class="lock-field-wrap">
+      <input id="lock-input" type="password" placeholder="Senha" autocomplete="current-password" />
+      <button id="lock-btn">Entrar</button>
+    </div>
+    <p id="lock-error" class="lock-error"></p>
+  </div>
+</div>
+
+<header>
+  <h1>Jogos Zerados</h1>
+</header>
+
+<nav class="tabs" id="tabs"></nav>
+
+<div id="loader">
+  <div class="spinner"></div>
+  <span>Carregando planilha...</span>
+</div>
+
+<div id="player-sections"></div>
+
+<div id="player-badge"></div>
+
+<div class="toolbar">
+  <button class="tool-btn" id="refreshBtn" title="Recarregar planilha">
+    <span class="btn-icon">↻</span>
+  </button>
+</div>
+
+<script>
+const SHEET_ID   = '1l3pzMoKJ42ypZjtUVnGcQ9zI-6JG7vGqeM5D9uXNynE';
+const SHEET_GIDS = ['1205894084', '2142659148'];
+
+const PLAYER_CONFIG = {
+  'DANIEL':            { color: '#a855f7', displayName: 'Daniel' },
+  'JOAO PEDRO CAMILO': { color: '#38bdf8', displayName: 'Jão' },
+  'JOAO':              { color: '#38bdf8', displayName: 'Jão' },
+  'NICOLAS':           { color: '#34d399', displayName: 'Nicolas' },
+  'RISSI':             { color: '#fb923c', displayName: 'Rissi' },
+};
+const FALLBACK_COLORS = ['#a855f7', '#38bdf8', '#34d399', '#fb923c', '#f472b6', '#fbbf24'];
+
+let PLAYERS       = {};
+let playerOrder   = [];
+let currentPlayer = '';
+let currentSort   = 'date';
+const coverCache  = JSON.parse(localStorage.getItem('cover_cache') || '{}');
+
+function fetchGvizJSONP(gid) {
+  return new Promise((resolve, reject) => {
+    const cb     = `_gviz_${gid}_${Date.now()}`;
+    const script = document.createElement('script');
+    const timer  = setTimeout(() => {
+      cleanup();
+      reject(new Error(`Timeout ao carregar gid=${gid}`));
+    }, 12000);
+
+    function cleanup() {
+      clearTimeout(timer);
+      delete window[cb];
+      script.remove();
+    }
+
+    window[cb] = data => {
+      cleanup();
+      if (data.status === 'error') {
+        reject(new Error(data.errors?.[0]?.detailed_message || data.errors?.[0]?.message || 'Erro na API'));
+        return;
+      }
+      resolve(gvizTableToRows(data.table));
+    };
+
+    script.onerror = () => { cleanup(); reject(new Error(`Falha ao carregar aba gid=${gid}`)); };
+    script.src = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?gid=${gid}&range=A:BZ&tqx=responseHandler:${cb}`;
+    document.head.appendChild(script);
+  });
+}
+
+function gvizTableToRows(table) {
+  const cols = table.cols || [];
+  const rows = [];
+
+  rows.push(cols.map(c => (c.label || '').trim()));
+
+  for (const row of (table.rows || [])) {
+    const cells = cols.map((col, i) => {
+      const cell = row.c?.[i];
+      if (!cell) return '';
+
+      if (cell.v === null || cell.v === undefined) {
+        return (cell.f != null) ? String(cell.f).trim() : '';
+      }
+
+      if (col.type === 'number') {
+        return String(cell.v);
+      }
+
+      if (col.type === 'date' && cell.v instanceof Date) {
+        const d = cell.v;
+        return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;
+      }
+
+      if (col.type === 'timeofday' && Array.isArray(cell.v)) {
+        const [h, m, s] = cell.v;
+        return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+      }
+
+      const val = (cell.f != null) ? cell.f : cell.v;
+      return String(val).trim();
+    });
+
+    if (cells.some(c => c !== '')) rows.push(cells);
+  }
+
+  return rows;
+}
+
+function parseSheetData(rows, colorIndex = 0) {
+  if (rows.length < 2) return {};
+
+  const headerRow = rows[0]; 
+  const colRow    = rows[1]; 
+
+  const sections = [];
+  for (let i = 0; i < headerRow.length; i++) {
+    if (/^lista\s+d[ao]\s+/i.test(headerRow[i])) {
+      const rawName = headerRow[i].replace(/^lista\s+d[ao]\s+/i, '').trim();
+      sections.push({ rawName, startCol: i });
+    }
+  }
+
+  for (const sec of sections) {
+    const sc = sec.startCol;
+    sec.colName = sc;
+    for (let i = sc; i < Math.min(sc + 30, colRow.length); i++) {
+      const h = (colRow[i] || '').toLowerCase()
+        .normalize('NFD').replace(/\p{Diacritic}/gu, '').trim();
+      if (h === 'jogos')                                         sec.colName       = i;
+      else if (h === 'console')                                  sec.colConsole    = i;
+      else if (h === 'genero')                                   sec.colGenre      = i;
+      else if (h === 'tipo')                                     sec.colType       = i;
+      else if (h === 'data')                                     sec.colDate       = i;
+      else if (h === 'tempo')                                    sec.colTime       = i;
+      else if (h === 'nota')                                     sec.colScore      = i;
+      else if (h.startsWith('dif'))                             sec.colDifficulty = i;
+      else if (h.startsWith('condi') || h.includes('zeramento')) sec.colCompletion = i;
+    }
+
+    if (sec.colConsole    === undefined) sec.colConsole    = sc + 7;
+    if (sec.colGenre      === undefined) sec.colGenre      = sc + 8;
+    if (sec.colType       === undefined) sec.colType       = sc + 9;
+    if (sec.colDate       === undefined) sec.colDate       = sc + 10;
+    if (sec.colTime       === undefined) sec.colTime       = sc + 11;
+    if (sec.colScore      === undefined) sec.colScore      = sc + 12;
+    if (sec.colDifficulty === undefined) sec.colDifficulty = sc + 13;
+    if (sec.colCompletion === undefined) sec.colCompletion = sc + 14;
+  }
+
+  const players = {};
+  const order   = [];
+
+  sections.forEach((sec, idx) => {
+    const rawUpper = sec.rawName.toUpperCase();
+    const cfg      = PLAYER_CONFIG[rawUpper] || {};
+    const color    = cfg.color || FALLBACK_COLORS[(colorIndex + idx) % FALLBACK_COLORS.length];
+    const name     = cfg.displayName || capitalize(sec.rawName.split(' ')[0]);
+    const key      = name.toLowerCase()
+      .normalize('NFD').replace(/\p{Diacritic}/gu, '');
+
+    const games = [];
+    for (let r = 2; r < rows.length; r++) {
+      const row      = rows[r];
+      const gameName = (row[sec.colName] || '').trim();
+      if (!gameName) continue;
+
+      games.push({
+        name:       gameName,
+        console:    (row[sec.colConsole]    || '').trim(),
+        genre:      (row[sec.colGenre]      || '').trim(),
+        type:       (row[sec.colType]       || '').trim(),
+        date:       (row[sec.colDate]       || '').trim(),
+        time:       cleanTime((row[sec.colTime] || '').trim()),
+        score:      parseInt(row[sec.colScore]) || 0,
+        difficulty: (row[sec.colDifficulty] || '').trim(),
+        completion: (row[sec.colCompletion] || '').trim(),
+      });
+    }
+
+    players[key] = { name, color, key, games };
+    order.push(key);
+  });
+
+  return { players, order };
+}
+
+function capitalize(s) {
+  if (!s) return s;
+  return s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
+}
+
+function cleanTime(t) {
+  if (!t || t.includes('?')) return '—';
+  return t.replace(/\s/g, ''); 
+}
+
+async function loadSheet() {
+  showLoader(true);
+  try {
+    const results = await Promise.all(SHEET_GIDS.map(fetchGvizJSONP));
+
+    let mergedPlayers = {};
+    let mergedOrder   = [];
+    let colorIndex    = 0;
+
+    for (const rows of results) {
+      const { players, order } = parseSheetData(rows, colorIndex);
+      colorIndex += order.length;
+
+      for (const key of order) {
+        if (mergedPlayers[key]) {
+          mergedPlayers[key].games.push(...players[key].games);
+        } else {
+          mergedPlayers[key] = players[key];
+          mergedOrder.push(key);
+        }
+      }
+    }
+
+    if (!mergedOrder.length) throw new Error('Nenhuma seção "Lista do ..." encontrada.');
+
+    PLAYERS       = mergedPlayers;
+    playerOrder   = mergedOrder;
+    currentPlayer = mergedOrder[0];
+
+    localStorage.setItem('sheet_cache', JSON.stringify({ players: PLAYERS, order: playerOrder }));
+
+    buildTabs();
+    buildSections();
+    showLoader(false);
+  } catch (err) {
+    const cached = localStorage.getItem('sheet_cache');
+    if (cached) {
+      const { players, order } = JSON.parse(cached);
+      PLAYERS       = players;
+      playerOrder   = order;
+      currentPlayer = order[0];
+      buildTabs();
+      buildSections();
+      showLoader(false);
+      showError(`Não foi possível carregar a planilha (${err.message}). Exibindo dados em cache.`, false);
+    } else {
+      showLoader(false);
+      showError(err.message, true);
+    }
+  }
+}
+
+function showLoader(visible) {
+  document.getElementById('loader').style.display = visible ? 'flex' : 'none';
+  document.getElementById('player-sections').style.display = visible ? 'none' : '';
+  document.getElementById('tabs').style.display = visible ? 'none' : '';
+}
+
+function showError(msg, fatal) {
+  const existing = document.getElementById('error-banner');
+  if (existing) existing.remove();
+
+  const div = document.createElement('div');
+  div.id = 'error-banner';
+  div.className = 'error-banner';
+  div.innerHTML = `
+    <strong>⚠ ${msg}</strong>
+    ${fatal ? `<br><br>Certifique-se que a planilha está compartilhada como <em>"Qualquer pessoa com o link"</em>
+    e abra o site via servidor HTTP (não como arquivo local):<code>python3 -m http.server 8080</code>` : ''}
+  `;
+  document.getElementById('player-sections').prepend(div);
+}
+
+const SEARCH_OVERRIDES = {
+  'homem aranha - remastered':             "Marvel's Spider-Man Remastered",
+  'insomnia : theater in the head':        'Insomnia The Ark',
+  'resident evil 4 (2004)':               'Resident Evil 4 2005',
+  'resident evil 2 remake':               'Resident Evil 2 2019',
+  'the last of us part i remake':         'The Last of Us Part I',
+  'dark souls 2 scholar of the first sin':'Dark Souls II',
+  'mega man maverick hunter x':           'Mega Man Maverick Hunter X',
+  'crash bandicoot n\'sane trilogy':      "Crash Bandicoot N. Sane Trilogy",
+};
+
+async function fetchJSON(url) {
+  try {
+    const r = await fetch(url);
+    if (r.ok) return await r.json();
+  } catch { /* */ }
+  return null;
+}
+
+async function fetchSteamCover(name) {
+  const steamUrl = `https://store.steampowered.com/api/storesearch/?term=${encodeURIComponent(name)}&cc=BR&l=pt`;
+  const data = await fetchJSON(`https://corsproxy.io/?url=${encodeURIComponent(steamUrl)}`);
+  const appId = data?.items?.[0]?.id;
+  if (!appId) return null;
+
+  const portraitUrl = `https://cdn.akamai.steamstatic.com/steam/apps/${appId}/library_600x900_2x.jpg`;
+  try {
+    const r = await fetch(portraitUrl, { method: 'HEAD' });
+    if (r.ok) return portraitUrl;
+  } catch { /* */ }
+
+  return null;
+}
+
+async function fetchWikiCover(name) {
+  for (const query of [`${name} video game`, name]) {
+    const search = await fetchJSON(
+      `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(query)}&srlimit=1&format=json&origin=*`
+    );
+    const title = search?.query?.search?.[0]?.title;
+    if (!title) continue;
+
+    const summary = await fetchJSON(
+      `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(title.replace(/ /g, '_'))}`
+    );
+
+    const img = summary?.originalimage?.source || summary?.thumbnail?.source;
+    if (img) return img;
+  }
+  return null;
+}
+
+async function fetchCover(game) {
+  const query = SEARCH_OVERRIDES[game.name.toLowerCase()] || game.name;
+  if (coverCache[query] !== undefined) return coverCache[query];
+
+  const cover = await fetchSteamCover(query) || await fetchWikiCover(query);
+  coverCache[query] = cover;
+  localStorage.setItem('cover_cache', JSON.stringify(coverCache));
+  return cover;
+}
+
+function parseHours(t) {
+  if (!t || t === '—' || t.includes('?')) return null;
+  const parts = t.split(':').map(Number);
+  if (parts.length >= 2) return parts[0] + parts[1] / 60;
+  return null;
+}
+
+function calcStats(games) {
+  const count    = games.length;
+  const scores   = games.map(g => g.score).filter(Boolean);
+  const avgScore = scores.length ? (scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(1) : '—';
+  const hours    = games.map(g => parseHours(g.time)).filter(n => n !== null);
+  const totalH   = hours.length ? Math.round(hours.reduce((a, b) => a + b, 0)) : null;
+  return { count, avgScore, totalH };
+}
+
+function smartDate(d) {
+  if (!d || d.includes('?')) return new Date(0);
+  const p = d.split('/');
+  if (p.length !== 3) return new Date(0);
+  const [a, b, y] = p.map(Number);
+  const [day, month] = a > 12 ? [a, b] : b > 12 ? [b, a] : [a, b];
+  return new Date(y, month - 1, day);
+}
+
+function sortGames(games, by) {
+  const copy = [...games];
+  if (by === 'score') return copy.sort((a, b) => b.score - a.score);
+  if (by === 'name')  return copy.sort((a, b) => a.name.localeCompare(b.name, 'pt'));
+  if (by === 'date')  return copy.sort((a, b) => smartDate(b.date) - smartDate(a.date));
+  return copy;
+}
+
+function diffClass(d) {
+  if (!d) return '';
+  const clean = d.replace(/[^A-Za-z]/g, '').toUpperCase();
+  if (clean === 'AS') return 'diff-AS';
+  return `diff-${clean.charAt(0)}`;
+}
+
+function scoreClass(s) {
+  if (s >= 10) return 'score-10';
+  if (s === 9) return 'score-9';
+  if (s === 8) return 'score-8';
+  if (s === 7) return 'score-7';
+  if (s === 6) return 'score-6';
+  if (s === 5) return 'score-5';
+  return 'score-low';
+}
+
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function renderCard(game, playerColor) {
+  const id    = `card-${game.name.replace(/\W/g, '_')}`;
+  const time  = game.time && game.time !== '—' && !game.time.includes('?')
+    ? `<div class="overlay-row"><span class="overlay-label">Tempo</span><span class="overlay-value">${esc(game.time)}</span></div>` : '';
+  const genre = [game.genre, game.type].filter(Boolean).join(' · ');
+
+  return `
+    <div class="card" id="${id}">
+      <div class="loading-cover" id="cov-${id}"></div>
+      <div class="card-overlay">
+        ${genre ? `<div class="overlay-row"><span class="overlay-label">Gênero</span><span class="overlay-value">${esc(genre)}</span></div>` : ''}
+        <div class="overlay-row"><span class="overlay-label">Data</span><span class="overlay-value">${esc(game.date) || '—'}</span></div>
+        ${time}
+        <div class="overlay-row"><span class="overlay-label">Zerou</span><span class="overlay-value" style="font-size:.72rem">${esc(game.completion) || '—'}</span></div>
+      </div>
+      <div class="card-footer">
+        <div class="card-name" title="${esc(game.name)}">${esc(game.name)}</div>
+        <div class="card-meta">
+          <span class="badge badge-console">${esc(game.console) || '—'}</span>
+          <span class="badge badge-diff ${diffClass(game.difficulty)}">${esc(game.difficulty) || '?'}</span>
+          <span class="score ${scoreClass(game.score)}">${game.score || '—'}</span>
+        </div>
+      </div>
+    </div>`;
+}
+
+function renderStats(games, player) {
+  const s = calcStats(games);
+  const hoursText = s.totalH !== null ? `${s.totalH}h` : '—';
+  return `
+    <div class="stats">
+      <div class="stat">
+        <div class="stat-value" style="color:${player.color}">${s.count}</div>
+        <div class="stat-label">Zerados</div>
+      </div>
+      <div class="divider"></div>
+      <div class="stat">
+        <div class="stat-value" style="color:${player.color}">${s.avgScore}</div>
+        <div class="stat-label">Nota Média</div>
+      </div>
+      <div class="divider"></div>
+      <div class="stat">
+        <div class="stat-value" style="color:${player.color}">${hoursText}</div>
+        <div class="stat-label">Horas*</div>
+      </div>
+    </div>`;
+}
+
+function renderSortBar() {
+  return `
+    <div class="sort-bar">
+      <span>* apenas jogos com tempo registrado</span>
+      <div class="sort-options">
+        <button class="sort-btn ${currentSort === 'date'  ? 'active' : ''}" data-sort="date">Data</button>
+        <button class="sort-btn ${currentSort === 'score' ? 'active' : ''}" data-sort="score">Nota</button>
+        <button class="sort-btn ${currentSort === 'name'  ? 'active' : ''}" data-sort="name">Nome</button>
+      </div>
+    </div>`;
+}
+
+function updatePlayerBadge(key) {
+  const badge = document.getElementById('player-badge');
+  if (!badge) return;
+  const p = PLAYERS[key];
+  if (!p) { badge.style.display = 'none'; return; }
+  badge.textContent = p.name;
+  badge.style.setProperty('--badge-color', p.color);
+  badge.style.display = 'block';
+}
+
+function buildTabs() {
+  const nav = document.getElementById('tabs');
+  nav.innerHTML = playerOrder.map((key, i) => {
+    const p = PLAYERS[key];
+    return `<button class="tab ${i === 0 ? 'active' : ''}" data-player="${key}"
+      style="color:${p.color}">${p.name}</button>`;
+  }).join('');
+
+  updatePlayerBadge(playerOrder[0]);
+
+  nav.addEventListener('click', e => {
+    const tab = e.target.closest('.tab');
+    if (!tab) return;
+    currentPlayer = tab.dataset.player;
+    nav.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    document.querySelectorAll('.player-section').forEach(s => s.classList.remove('active'));
+    document.getElementById(`section-${currentPlayer}`)?.classList.add('active');
+    updatePlayerBadge(currentPlayer);
+    loadCoversForCurrentPlayer();
+  });
+}
+
+function buildSections() {
+  const container = document.getElementById('player-sections');
+  container.innerHTML = '';
+
+  playerOrder.forEach(key => {
+    const player = PLAYERS[key];
+    const sorted = sortGames(player.games, currentSort);
+    const section = document.createElement('div');
+    section.className = `player-section ${key === currentPlayer ? 'active' : ''}`;
+    section.id = `section-${key}`;
+
+    if (player.games.length === 0) {
+      section.innerHTML = `
+        ${renderStats([], player)}
+        <div class="grid"><div class="empty"><div class="empty-icon">🎮</div>
+        <p>Nenhum jogo cadastrado ainda na planilha.</p></div></div>`;
+    } else {
+      section.innerHTML = `
+        ${renderStats(player.games, player)}
+        ${renderSortBar()}
+        <div class="grid">${sorted.map(g => renderCard(g, player.color)).join('')}</div>`;
+    }
+    container.appendChild(section);
+  });
+
+  loadCoversForCurrentPlayer();
+  bindSortButtons();
+}
+
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+function makePlaceholder(name) {
+  const div = document.createElement('div');
+  div.className = 'cover-placeholder';
+  div.innerHTML = `<div class="placeholder-icon">🎮</div><div class="placeholder-name">${esc(name)}</div>`;
+  return div;
+}
+
+async function loadCoversForCurrentPlayer() {
+  const player = PLAYERS[currentPlayer];
+  if (!player) return;
+  const sorted = sortGames(player.games, currentSort);
+
+  for (let i = 0; i < sorted.length; i++) {
+    const game   = sorted[i];
+    const cardId = `card-${game.name.replace(/\W/g, '_')}`;
+    const target = document.getElementById(`cov-${cardId}`);
+    if (!target) continue;
+
+    const imgUrl = await fetchCover(game);
+
+    if (imgUrl) {
+      const img = document.createElement('img');
+      img.className = 'cover';
+      img.alt = game.name;
+      img.loading = 'lazy';
+
+      img.onerror = async () => {
+        img.onerror = null;
+        const query = SEARCH_OVERRIDES[game.name.toLowerCase()] || game.name;
+        const wiki  = await fetchWikiCover(game.name);
+        if (wiki) {
+          coverCache[query] = wiki;
+          localStorage.setItem('cover_cache', JSON.stringify(coverCache));
+          img.src = wiki;
+        } else {
+          coverCache[query] = null;
+          localStorage.setItem('cover_cache', JSON.stringify(coverCache));
+          img.replaceWith(makePlaceholder(game.name));
+        }
+      };
+
+      img.src = imgUrl;
+      target.replaceWith(img);
+    } else {
+      target.replaceWith(makePlaceholder(game.name));
+    }
+
+    if (i < sorted.length - 1) await sleep(150);
+  }
+}
+
+function bindSortButtons() {
+  document.querySelectorAll('.sort-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      currentSort = btn.dataset.sort;
+      buildSections();
+    });
+  });
+}
+
+const refreshBtn = document.getElementById('refreshBtn');
+refreshBtn.addEventListener('click', () => {
+  localStorage.clear();
+  Object.keys(coverCache).forEach(k => delete coverCache[k]);
+  refreshBtn.classList.add('spinning');
+  refreshBtn.disabled = true;
+  loadSheet().finally(() => {
+    refreshBtn.classList.remove('spinning');
+    refreshBtn.disabled = false;
+  });
+});
+
+const PWD_HASH = 'a3187d5b428b9e2d070f8a958655ebcda42a5cc12a4f1632367b6a2c938fb741';
+
+async function sha256(str) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
+}
+
+async function tryUnlock() {
+  const val = document.getElementById('lock-input').value;
+  const hash = await sha256(val);
+  if (hash === PWD_HASH) {
+    sessionStorage.setItem('auth', '1');
+    document.getElementById('lock-screen').style.display = 'none';
+    showLoader(true);
+    loadSheet();
+  } else {
+    const err = document.getElementById('lock-error');
+    err.textContent = 'Senha incorreta.';
+    document.getElementById('lock-input').value = '';
+    document.getElementById('lock-input').focus();
+    setTimeout(() => err.textContent = '', 2000);
+  }
+}
+
+const lockInput = document.getElementById('lock-input');
+const lockBtn   = document.getElementById('lock-btn');
+lockBtn.addEventListener('click', tryUnlock);
+lockInput.addEventListener('keydown', e => { if (e.key === 'Enter') tryUnlock(); });
+
+if (sessionStorage.getItem('auth') === '1') {
+  document.getElementById('lock-screen').style.display = 'none';
+  showLoader(true);
+  loadSheet();
+}
+</script>
+
+</body>
+</html>
