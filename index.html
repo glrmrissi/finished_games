@@ -38,6 +38,12 @@
 
 <div id="player-badge"></div>
 
+<div id="sidebar-overlay"></div>
+<aside id="sidebar">
+  <button id="sidebar-close" title="Fechar">✕</button>
+  <div id="sidebar-content"></div>
+</aside>
+
 <div class="toolbar">
   <button class="tool-btn" id="refreshBtn" title="Recarregar planilha">
     <span class="btn-icon">↻</span>
@@ -139,16 +145,22 @@ function gvizTableToRows(table) {
   return rows;
 }
 
+function normalizeHeader(s) {
+  return (s || '').toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '').trim();
+}
+
 function parseSheetData(rows, colorIndex = 0) {
   if (rows.length < 2) return {};
 
-  const headerRow = rows[0]; 
-  const colRow    = rows[1]; 
+  const headerRow = rows[0];
+
+  const colRow    = rows[0];
+  const dataStart = 1;
 
   const sections = [];
   for (let i = 0; i < headerRow.length; i++) {
     if (/^lista\s+d[ao]\s+/i.test(headerRow[i])) {
-      const rawName = headerRow[i].replace(/^lista\s+d[ao]\s+/i, '').trim();
+      const rawName = headerRow[i].replace(/^lista\s+d[ao]\s+/i, '').replace(/\s+jogos$/i, '').trim();
       sections.push({ rawName, startCol: i });
     }
   }
@@ -157,8 +169,7 @@ function parseSheetData(rows, colorIndex = 0) {
     const sc = sec.startCol;
     sec.colName = sc;
     for (let i = sc; i < Math.min(sc + 30, colRow.length); i++) {
-      const h = (colRow[i] || '').toLowerCase()
-        .normalize('NFD').replace(/\p{Diacritic}/gu, '').trim();
+      const h = normalizeHeader(colRow[i]);
       if (h === 'jogos')                                         sec.colName       = i;
       else if (h === 'console')                                  sec.colConsole    = i;
       else if (h === 'genero')                                   sec.colGenre      = i;
@@ -168,6 +179,7 @@ function parseSheetData(rows, colorIndex = 0) {
       else if (h === 'nota')                                     sec.colScore      = i;
       else if (h.startsWith('dif'))                             sec.colDifficulty = i;
       else if (h.startsWith('condi') || h.includes('zeramento')) sec.colCompletion = i;
+      else if (h.startsWith('resenha'))                          sec.colReview     = i;
     }
 
     if (sec.colConsole    === undefined) sec.colConsole    = sc + 7;
@@ -192,7 +204,7 @@ function parseSheetData(rows, colorIndex = 0) {
       .normalize('NFD').replace(/\p{Diacritic}/gu, '');
 
     const games = [];
-    for (let r = 2; r < rows.length; r++) {
+    for (let r = dataStart; r < rows.length; r++) {
       const row      = rows[r];
       const gameName = (row[sec.colName] || '').trim();
       if (!gameName) continue;
@@ -207,6 +219,7 @@ function parseSheetData(rows, colorIndex = 0) {
         score:      parseInt(row[sec.colScore]) || 0,
         difficulty: (row[sec.colDifficulty] || '').trim(),
         completion: (row[sec.colCompletion] || '').trim(),
+        review:     (sec.colReview !== undefined ? row[sec.colReview] || '' : '').trim(),
       });
     }
 
@@ -435,14 +448,14 @@ function esc(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
-function renderCard(game, playerColor) {
+function renderCard(game, playerColor, playerKey) {
   const id    = `card-${game.name.replace(/\W/g, '_')}`;
   const time  = game.time && game.time !== '—' && !game.time.includes('?')
     ? `<div class="overlay-row"><span class="overlay-label">Tempo</span><span class="overlay-value">${esc(game.time)}</span></div>` : '';
   const genre = [game.genre, game.type].filter(Boolean).join(' · ');
 
   return `
-    <div class="card" id="${id}">
+    <div class="card" id="${id}" data-player="${esc(playerKey)}" data-game="${esc(game.name)}" role="button" tabindex="0">
       <div class="loading-cover" id="cov-${id}"></div>
       <div class="card-overlay">
         ${genre ? `<div class="overlay-row"><span class="overlay-label">Gênero</span><span class="overlay-value">${esc(genre)}</span></div>` : ''}
@@ -575,7 +588,7 @@ function buildSections() {
       section.innerHTML = `
         ${renderStats(player.games, player)}
         ${renderSortBar(key)}
-        <div class="grid" id="grid-${key}">${firstBatch.map(g => renderCard(g, player.color)).join('')}</div>
+        <div class="grid" id="grid-${key}">${firstBatch.map(g => renderCard(g, player.color, key)).join('')}</div>
         <div class="sentinel" id="sentinel-${key}"></div>`;
     }
     container.appendChild(section);
@@ -666,13 +679,16 @@ function loadMoreCards(key) {
   const grid = document.getElementById(`grid-${key}`);
   if (!grid) return;
 
-  grid.insertAdjacentHTML('beforeend', sorted.slice(from, to).map(g => renderCard(g, player.color)).join(''));
+  grid.insertAdjacentHTML('beforeend', sorted.slice(from, to).map(g => renderCard(g, player.color, key)).join(''));
   playerPages[key] = to;
   loadPendingCovers(key);
 
   if (to >= sorted.length) {
     disconnectObserver(key);
     document.getElementById(`sentinel-${key}`)?.remove();
+  } else {
+    // Reconecta o observer para detectar se o sentinel ainda está visível
+    setupObserver(key);
   }
 }
 
@@ -681,7 +697,7 @@ function setupObserver(key) {
   const sentinel = document.getElementById(`sentinel-${key}`);
   if (!sentinel) return;
   const player = PLAYERS[key];
-  if (!player || (playerPages[key] || 0) >= player.games.length) {
+  if (!player || (playerPages[key] || 0) >= getFilteredGames(key).length) {
     sentinel.remove();
     return;
   }
@@ -690,6 +706,68 @@ function setupObserver(key) {
   }, { rootMargin: '300px' });
   observers[key].observe(sentinel);
 }
+
+
+function openSidebar(playerKey, gameName) {
+  const player = PLAYERS[playerKey];
+  if (!player) return;
+  const game = player.games.find(g => g.name === gameName);
+  if (!game) return;
+
+  const genre = [game.genre, game.type].filter(Boolean).join(' · ');
+  const coverEl = document.querySelector(`#card-${game.name.replace(/\W/g, '_')} img.cover`);
+  const coverSrc = coverEl?.src || '';
+
+  document.getElementById('sidebar-content').innerHTML = `
+    <div class="sb-cover-wrap">
+      ${coverSrc
+        ? `<img class="sb-cover" src="${esc(coverSrc)}" alt="${esc(game.name)}">`
+        : `<div class="sb-cover-placeholder"><div class="placeholder-icon">🎮</div></div>`}
+    </div>
+    <div class="sb-body">
+      <h2 class="sb-title">${esc(game.name)}</h2>
+      <div class="sb-score ${scoreClass(game.score)}" style="border-color:${esc(player.color)}">${game.score || '—'}</div>
+      <div class="sb-info">
+        ${row('Console',      game.console)}
+        ${row('Gênero',       genre)}
+        ${row('Dificuldade',  game.difficulty)}
+        ${row('Data',         game.date)}
+        ${row('Tempo',        game.time && game.time !== '—' ? game.time : '')}
+        ${row('Zeramento',    game.completion)}
+      </div>
+      ${game.review ? `
+        <div class="sb-review-section">
+          <div class="sb-review-label">Resenha</div>
+          <p class="sb-review">${esc(game.review).replace(/\n/g, '<br>')}</p>
+        </div>` : ''}
+    </div>`;
+
+  document.getElementById('sidebar').classList.add('open');
+  document.getElementById('sidebar-overlay').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+
+function row(label, val) {
+  if (!val) return '';
+  return `<div class="sb-row"><span class="sb-label">${label}</span><span class="sb-val">${esc(val)}</span></div>`;
+}
+
+function closeSidebar() {
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('sidebar-overlay').classList.remove('open');
+  document.body.style.overflow = '';
+}
+
+document.getElementById('sidebar-close').addEventListener('click', closeSidebar);
+document.getElementById('sidebar-overlay').addEventListener('click', closeSidebar);
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeSidebar(); });
+
+document.getElementById('player-sections').addEventListener('click', e => {
+  const card = e.target.closest('.card[data-game]');
+  if (!card) return;
+  openSidebar(card.dataset.player, card.dataset.game);
+});
+
 
 function bindSortButtons() {
   document.querySelectorAll('.sort-btn').forEach(btn => {
