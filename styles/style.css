@@ -491,7 +491,8 @@
         color: var(--text);
     }
 
-    .console-filter {
+    .console-filter,
+    .genre-filter {
         padding: 5px 28px 5px 12px;
         background: transparent;
         border: 1px solid var(--border);
@@ -510,13 +511,16 @@
     }
 
     .console-filter:hover,
-    .console-filter:focus {
+    .console-filter:focus,
+    .genre-filter:hover,
+    .genre-filter:focus {
         border-color: var(--text);
         color: var(--text);
         outline: none;
     }
 
-    .console-filter option {
+    .console-filter option,
+    .genre-filter option {
         background: #0f0f1a;
         color: var(--text);
     }

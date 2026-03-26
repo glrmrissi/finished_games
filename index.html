@@ -67,7 +67,8 @@ const PAGE_SIZE     = 10;
 const playerPages   = {};  
 const playerCovIdx  = {};  
 const observers     = {};  
-const playerConsole = {};  
+const playerConsole = {};
+const playerGenre   = {};
 
 function fetchGvizJSONP(gid) {
   return new Promise((resolve, reject) => {
@@ -389,13 +390,20 @@ function smartDate(d) {
 function getFilteredGames(key) {
   const player = PLAYERS[key];
   if (!player) return [];
-  const cons = playerConsole[key] || 'all';
-  const games = cons === 'all' ? player.games : player.games.filter(g => g.console === cons);
+  const cons  = playerConsole[key] || 'all';
+  const genre = playerGenre[key]   || 'all';
+  let games = player.games;
+  if (cons  !== 'all') games = games.filter(g => g.console === cons);
+  if (genre !== 'all') games = games.filter(g => g.genre === genre);
   return sortGames(games, currentSort);
 }
 
 function getPlayerConsoles(games) {
   return [...new Set(games.map(g => g.console).filter(Boolean))].sort();
+}
+
+function getPlayerGenres(games) {
+  return [...new Set(games.map(g => g.genre).filter(Boolean))].sort();
 }
 
 function sortGames(games, by) {
@@ -477,17 +485,23 @@ function renderStats(games, player) {
 
 function renderSortBar(key) {
   const player   = PLAYERS[key];
-  const consoles = getPlayerConsoles(player.games);
-  const selected = playerConsole[key] || 'all';
-  const options  = ['all', ...consoles].map(c =>
-    `<option value="${esc(c)}" ${selected === c ? 'selected' : ''}>${c === 'all' ? 'Todos' : esc(c)}</option>`
+
+  const selCons  = playerConsole[key] || 'all';
+  const conOpts  = ['all', ...getPlayerConsoles(player.games)].map(c =>
+    `<option value="${esc(c)}" ${selCons === c ? 'selected' : ''}>${c === 'all' ? 'Console' : esc(c)}</option>`
+  ).join('');
+
+  const selGenre = playerGenre[key] || 'all';
+  const genOpts  = ['all', ...getPlayerGenres(player.games)].map(g =>
+    `<option value="${esc(g)}" ${selGenre === g ? 'selected' : ''}>${g === 'all' ? 'Gênero' : esc(g)}</option>`
   ).join('');
 
   return `
     <div class="sort-bar">
       <span>* apenas jogos com tempo registrado</span>
       <div class="sort-options">
-        <select class="console-filter" data-player="${key}">${options}</select>
+        <select class="console-filter" data-player="${key}">${conOpts}</select>
+        <select class="genre-filter"   data-player="${key}">${genOpts}</select>
         <button class="sort-btn ${currentSort === 'date'  ? 'active' : ''}" data-sort="date">Data</button>
         <button class="sort-btn ${currentSort === 'score' ? 'active' : ''}" data-sort="score">Nota</button>
         <button class="sort-btn ${currentSort === 'name'  ? 'active' : ''}" data-sort="name">Nome</button>
@@ -687,6 +701,12 @@ function bindSortButtons() {
   document.querySelectorAll('.console-filter').forEach(sel => {
     sel.addEventListener('change', () => {
       playerConsole[sel.dataset.player] = sel.value;
+      buildSections();
+    });
+  });
+  document.querySelectorAll('.genre-filter').forEach(sel => {
+    sel.addEventListener('change', () => {
+      playerGenre[sel.dataset.player] = sel.value;
       buildSections();
     });
   });
