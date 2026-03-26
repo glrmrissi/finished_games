@@ -63,6 +63,11 @@ let currentPlayer = '';
 let currentSort   = 'date';
 const coverCache  = JSON.parse(localStorage.getItem('cover_cache') || '{}');
 
+const PAGE_SIZE     = 10;
+const playerPages   = {};  // quantos cards já foram renderizados por player
+const playerCovIdx  = {};  // até qual índice as covers já foram requisitadas
+const observers     = {};  // IntersectionObserver por player
+
 function fetchGvizJSONP(gid) {
   return new Promise((resolve, reject) => {
     const cb     = `_gviz_${gid}_${Date.now()}`;
@@ -498,13 +503,18 @@ function buildTabs() {
     document.querySelectorAll('.player-section').forEach(s => s.classList.remove('active'));
     document.getElementById(`section-${currentPlayer}`)?.classList.add('active');
     updatePlayerBadge(currentPlayer);
-    loadCoversForCurrentPlayer();
+    loadPendingCovers(currentPlayer);
+    setupObserver(currentPlayer);
   });
 }
 
 function buildSections() {
+  Object.keys(observers).forEach(disconnectObserver);
+
   const container = document.getElementById('player-sections');
   container.innerHTML = '';
+
+  playerOrder.forEach(key => { playerPages[key] = 0; playerCovIdx[key] = 0; });
 
   playerOrder.forEach(key => {
     const player = PLAYERS[key];
@@ -519,15 +529,19 @@ function buildSections() {
         <div class="grid"><div class="empty"><div class="empty-icon">🎮</div>
         <p>Nenhum jogo cadastrado ainda na planilha.</p></div></div>`;
     } else {
+      const firstBatch = sorted.slice(0, PAGE_SIZE);
+      playerPages[key] = Math.min(PAGE_SIZE, sorted.length);
       section.innerHTML = `
         ${renderStats(player.games, player)}
         ${renderSortBar()}
-        <div class="grid">${sorted.map(g => renderCard(g, player.color)).join('')}</div>`;
+        <div class="grid" id="grid-${key}">${firstBatch.map(g => renderCard(g, player.color)).join('')}</div>
+        <div class="sentinel" id="sentinel-${key}"></div>`;
     }
     container.appendChild(section);
   });
 
-  loadCoversForCurrentPlayer();
+  loadPendingCovers(currentPlayer);
+  setupObserver(currentPlayer);
   bindSortButtons();
 }
 
@@ -540,12 +554,12 @@ function makePlaceholder(name) {
   return div;
 }
 
-async function loadCoversForCurrentPlayer() {
-  const player = PLAYERS[currentPlayer];
+async function loadCoversFrom(key, from, to) {
+  const player = PLAYERS[key];
   if (!player) return;
   const sorted = sortGames(player.games, currentSort);
 
-  for (let i = 0; i < sorted.length; i++) {
+  for (let i = from; i < Math.min(to, sorted.length); i++) {
     const game   = sorted[i];
     const cardId = `card-${game.name.replace(/\W/g, '_')}`;
     const target = document.getElementById(`cov-${cardId}`);
@@ -580,8 +594,60 @@ async function loadCoversForCurrentPlayer() {
       target.replaceWith(makePlaceholder(game.name));
     }
 
-    if (i < sorted.length - 1) await sleep(150);
+    if (i < to - 1) await sleep(150);
   }
+}
+
+function loadPendingCovers(key) {
+  const from = playerCovIdx[key] || 0;
+  const to   = playerPages[key]  || 0;
+  if (from < to) {
+    playerCovIdx[key] = to; // marca antecipado para evitar chamadas duplicadas
+    loadCoversFrom(key, from, to);
+  }
+}
+
+function disconnectObserver(key) {
+  if (observers[key]) {
+    observers[key].disconnect();
+    delete observers[key];
+  }
+}
+
+function loadMoreCards(key) {
+  const player = PLAYERS[key];
+  if (!player) return;
+  const sorted = sortGames(player.games, currentSort);
+  const from   = playerPages[key] || 0;
+  if (from >= sorted.length) { disconnectObserver(key); return; }
+
+  const to   = Math.min(from + PAGE_SIZE, sorted.length);
+  const grid = document.getElementById(`grid-${key}`);
+  if (!grid) return;
+
+  grid.insertAdjacentHTML('beforeend', sorted.slice(from, to).map(g => renderCard(g, player.color)).join(''));
+  playerPages[key] = to;
+  loadPendingCovers(key);
+
+  if (to >= sorted.length) {
+    disconnectObserver(key);
+    document.getElementById(`sentinel-${key}`)?.remove();
+  }
+}
+
+function setupObserver(key) {
+  disconnectObserver(key);
+  const sentinel = document.getElementById(`sentinel-${key}`);
+  if (!sentinel) return;
+  const player = PLAYERS[key];
+  if (!player || (playerPages[key] || 0) >= player.games.length) {
+    sentinel.remove();
+    return;
+  }
+  observers[key] = new IntersectionObserver(entries => {
+    if (entries[0].isIntersecting) loadMoreCards(key);
+  }, { rootMargin: '300px' });
+  observers[key].observe(sentinel);
 }
 
 function bindSortButtons() {

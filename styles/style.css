@@ -806,3 +806,7 @@
         .badge { padding: 2px 6px; font-size: .6rem; }
         .score { font-size: .8rem; }
     }
+.sentinel {
+    height: 1px;
+    visibility: hidden;
+}
