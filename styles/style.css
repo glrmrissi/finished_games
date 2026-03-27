@@ -471,6 +471,7 @@
     .sort-options {
         display: flex;
         gap: 8px;
+        flex-wrap: wrap;
     }
 
     .sort-btn {
@@ -986,3 +987,201 @@
 
 .card { cursor: pointer; }
 .card:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
+
+.tab-stats {
+    color: #94a3b8;
+}
+.tab-stats:hover {
+    color: var(--text);
+    border-color: var(--text);
+}
+.tab-stats.active {
+    background: #94a3b8;
+    border-color: #94a3b8;
+    color: var(--bg) !important;
+}
+
+.stats-page {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 32px 24px 80px;
+}
+
+.stats-player-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 16px;
+    margin-bottom: 48px;
+}
+
+.stats-pcard {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px 16px;
+    text-align: center;
+    transition: border-color .25s, transform .2s;
+}
+
+.stats-pcard-name {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 1.05rem;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    margin-bottom: 16px;
+}
+
+.stats-pcard-row {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.stats-pcard-row:last-child { margin-bottom: 0; }
+
+.stats-pcard-val {
+    font-family: 'Orbitron', monospace;
+    font-size: 1.5rem;
+    font-weight: 700;
+    line-height: 1;
+}
+
+.stats-pcard-sub {
+    font-size: .62rem;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-top: 4px;
+}
+
+.pie-charts-row {
+    display: flex;
+    gap: 40px;
+    justify-content: center;
+    flex-wrap: wrap;
+    margin-bottom: 48px;
+}
+
+.pie-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+}
+
+.pie-title {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: .8rem;
+    font-weight: 700;
+    letter-spacing: 2.5px;
+    text-transform: uppercase;
+    color: var(--muted);
+}
+
+.pie-svg {
+    width: 160px;
+    height: 160px;
+    filter: drop-shadow(0 4px 16px rgba(0,0,0,.5));
+}
+
+.pie-legend {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 120px;
+}
+
+.pie-legend-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: .78rem;
+}
+
+.pie-dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.pie-lbl {
+    font-family: 'Rajdhani', sans-serif;
+    font-weight: 600;
+    letter-spacing: .5px;
+    flex: 1;
+}
+
+.pie-pct {
+    font-family: 'Orbitron', monospace;
+    font-size: .68rem;
+    color: var(--muted);
+}
+
+.stats-chart-section {
+    margin-bottom: 40px;
+}
+
+.stats-chart-title {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: .8rem;
+    font-weight: 700;
+    letter-spacing: 2.5px;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 14px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+}
+
+.stats-bar-row {
+    display: grid;
+    grid-template-columns: 72px 1fr 60px;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 10px;
+}
+
+.stats-bar-name {
+    font-family: 'Rajdhani', sans-serif;
+    font-weight: 600;
+    font-size: .88rem;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    text-align: right;
+}
+
+.stats-bar-track {
+    background: var(--card2);
+    border-radius: 4px;
+    height: 22px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+}
+
+.stats-bar-fill {
+    height: 100%;
+    border-radius: 4px;
+    transition: width .7s cubic-bezier(.4,0,.2,1);
+    opacity: .8;
+    min-width: 2px;
+}
+
+.stats-bar-val {
+    font-family: 'Orbitron', monospace;
+    font-size: .75rem;
+    font-weight: 700;
+    color: var(--text);
+}
+
+@media (max-width: 600px) {
+    .stats-page { padding: 20px 12px 80px; }
+    .stats-player-cards { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+    .stats-pcard { padding: 14px 10px; }
+    .stats-pcard-val { font-size: 1.2rem; }
+    .stats-bar-row { grid-template-columns: 56px 1fr 48px; gap: 8px; }
+    .stats-bar-name { font-size: .75rem; }
+    .stats-bar-val { font-size: .68rem; }
+}

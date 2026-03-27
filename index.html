@@ -549,7 +549,7 @@ function buildTabs() {
     const p = PLAYERS[key];
     return `<button class="tab ${i === 0 ? 'active' : ''}" data-player="${key}"
       style="color:${p.color}">${p.name}</button>`;
-  }).join('');
+  }).join('') + `<button class="tab tab-stats" data-player="stats">Stats</button>`;
 
   updatePlayerBadge(playerOrder[0]);
 
@@ -609,9 +609,110 @@ function buildSections() {
     container.appendChild(section);
   });
 
+  buildStatsSection(container);
+
   loadPendingCovers(currentPlayer);
   setupObserver(currentPlayer);
   bindSortButtons();
+}
+
+function buildStatsSection(container) {
+  const allStats = playerOrder.map(k => {
+    const p = PLAYERS[k];
+    const s = calcStats(p.games);
+    return { player: p, count: s.count, totalH: s.totalH, avgScore: s.avgScore };
+  });
+
+  const maxCount = Math.max(...allStats.map(s => s.count), 1);
+  const maxHours = Math.max(...allStats.map(s => s.totalH || 0), 1);
+
+  function pieChart(slices, title) {
+    const total = slices.reduce((s, d) => s + (d.value || 0), 0);
+    if (total === 0) return '';
+    const cx = 90, cy = 90, r = 75;
+    let angle = -Math.PI / 2;
+    const paths = slices.filter(d => d.value > 0).map(d => {
+      const sweep = (d.value / total) * 2 * Math.PI;
+      const x1 = cx + r * Math.cos(angle);
+      const y1 = cy + r * Math.sin(angle);
+      angle += sweep;
+      const x2 = cx + r * Math.cos(angle);
+      const y2 = cy + r * Math.sin(angle);
+      const large = sweep > Math.PI ? 1 : 0;
+      return `<path d="M${cx},${cy} L${x1.toFixed(2)},${y1.toFixed(2)} A${r},${r} 0 ${large},1 ${x2.toFixed(2)},${y2.toFixed(2)} Z" fill="${d.color}" opacity="0.85"><title>${esc(d.label)}: ${d.fmt} (${Math.round(d.value/total*100)}%)</title></path>`;
+    }).join('');
+    const legend = slices.filter(d => d.value > 0).map(d =>
+      `<div class="pie-legend-row">
+        <span class="pie-dot" style="background:${d.color}"></span>
+        <span class="pie-lbl">${esc(d.label)}</span>
+        <span class="pie-pct">${Math.round(d.value / total * 100)}%</span>
+      </div>`
+    ).join('');
+    return `
+      <div class="pie-wrap">
+        <div class="pie-title">${title}</div>
+        <svg viewBox="0 0 180 180" class="pie-svg">${paths}</svg>
+        <div class="pie-legend">${legend}</div>
+      </div>`;
+  }
+
+  function barSection(title, getValue, formatValue, maxVal) {
+    return `
+      <div class="stats-chart-section">
+        <div class="stats-chart-title">${title}</div>
+        <div class="stats-chart-bars">
+          ${allStats.map(s => {
+            const val = getValue(s);
+            const pct = maxVal > 0 ? Math.round(val / maxVal * 100) : 0;
+            return `
+              <div class="stats-bar-row">
+                <div class="stats-bar-name" style="color:${s.player.color}">${s.player.name}</div>
+                <div class="stats-bar-track">
+                  <div class="stats-bar-fill" style="width:${pct}%;background:${s.player.color}"></div>
+                </div>
+                <div class="stats-bar-val">${formatValue(s)}</div>
+              </div>`;
+          }).join('')}
+        </div>
+      </div>`;
+  }
+
+  const html = `
+    <div class="stats-page">
+      <div class="stats-player-cards">
+        ${allStats.map(s => `
+          <div class="stats-pcard">
+            <div class="stats-pcard-name" style="color:${s.player.color}">${s.player.name}</div>
+            <div class="stats-pcard-row">
+              <span class="stats-pcard-val" style="color:${s.player.color}">${s.count}</span>
+              <span class="stats-pcard-sub">jogos</span>
+            </div>
+            <div class="stats-pcard-row">
+              <span class="stats-pcard-val" style="color:${s.player.color}">${s.totalH !== null ? s.totalH + 'h' : '—'}</span>
+              <span class="stats-pcard-sub">horas</span>
+            </div>
+            <div class="stats-pcard-row">
+              <span class="stats-pcard-val" style="color:${s.player.color}">${s.avgScore}</span>
+              <span class="stats-pcard-sub">nota méd.</span>
+            </div>
+          </div>`).join('')}
+      </div>
+
+      <div class="pie-charts-row">
+        ${pieChart(allStats.map(s => ({ label: s.player.name, value: s.count, fmt: s.count, color: s.player.color })), 'Jogos Zerados')}
+        ${pieChart(allStats.map(s => ({ label: s.player.name, value: s.totalH || 0, fmt: s.totalH !== null ? s.totalH + 'h' : '—', color: s.player.color })), 'Horas Jogadas')}
+      </div>
+
+      ${barSection('Jogos Zerados', s => s.count, s => s.count, maxCount)}
+      ${barSection('Horas Jogadas', s => s.totalH || 0, s => s.totalH !== null ? s.totalH + 'h' : '—', maxHours)}
+      ${barSection('Nota Média', s => parseFloat(s.avgScore) || 0, s => s.avgScore, 10)}
+    </div>`;
+
+  const section = document.createElement('div');
+  section.className = 'player-section';
+  section.id = 'section-stats';
+  section.innerHTML = html;
+  container.appendChild(section);
 }
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
