@@ -167,10 +167,12 @@ function parseSheetData(rows, colorIndex = 0) {
     }
   }
 
-  for (const sec of sections) {
-    const sc = sec.startCol;
+  for (let s = 0; s < sections.length; s++) {
+    const sec     = sections[s];
+    const sc      = sec.startCol;
+    const nextSc  = sections[s + 1]?.startCol ?? colRow.length;
     sec.colName = sc;
-    for (let i = sc; i < Math.min(sc + 30, colRow.length); i++) {
+    for (let i = sc; i < Math.min(nextSc, colRow.length); i++) {
       const h = normalizeHeader(colRow[i]);
       if (h === 'jogos')                                         sec.colName       = i;
       else if (h === 'console')                                  sec.colConsole    = i;
