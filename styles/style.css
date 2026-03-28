@@ -544,6 +544,53 @@
         line-height: 1.6;
     }
 
+    /* ── Sagas view ──────────────────────────────── */
+    .sagas-view {
+        padding: 0 24px 60px;
+        max-width: 1400px;
+        margin: 0 auto;
+    }
+
+    .saga-row {
+        margin-bottom: 36px;
+    }
+
+    .saga-header {
+        display: flex;
+        align-items: baseline;
+        gap: 10px;
+        margin-bottom: 12px;
+        padding-left: 2px;
+    }
+
+    .saga-title {
+        font-family: 'Rajdhani', sans-serif;
+        font-size: 1rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 2px;
+        color: var(--text);
+    }
+
+    .saga-count {
+        font-family: 'Orbitron', monospace;
+        font-size: .7rem;
+        font-weight: 700;
+        opacity: .8;
+    }
+
+    .saga-track {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+        gap: 12px;
+    }
+
+    .saga-track .card {
+        width: 100%;
+    }
+
+    /* ─────────────────────────────────────────────── */
+
     .player-section {
         display: none;
     }

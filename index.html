@@ -63,6 +63,64 @@ const PLAYER_CONFIG = {
 };
 const FALLBACK_COLORS = ['#a855f7', '#38bdf8', '#34d399', '#fb923c', '#f472b6', '#fbbf24'];
 
+const SAGAS = [
+  { name: 'Resident Evil',     patterns: [/resident evil/i, /biohazard/i] },
+  { name: 'Grand Theft Auto',  patterns: [/grand theft auto/i, /\bgta\b/i] },
+  { name: 'Red Dead',          patterns: [/red dead/i] },
+  { name: 'The Last of Us',    patterns: [/last of us/i] },
+  { name: 'Uncharted',         patterns: [/uncharted/i] },
+  { name: 'God of War',        patterns: [/god of war/i] },
+  { name: 'Souls / Elden Ring',patterns: [/dark souls/i, /\bsekiro\b/i, /\belden ring\b/i, /\bbloodborne\b/i, /demon.s souls/i] },
+  { name: 'Final Fantasy',     patterns: [/final fantasy/i] },
+  { name: 'The Witcher',       patterns: [/witcher/i] },
+  { name: "Assassin's Creed",  patterns: [/assassin.s creed/i] },
+  { name: 'Metal Gear',        patterns: [/metal gear/i] },
+  { name: 'Batman Arkham',     patterns: [/batman/i, /\barkham\b/i] },
+  { name: 'Spider-Man',        patterns: [/spider.man/i] },
+  { name: 'Halo',              patterns: [/\bhalo\b/i] },
+  { name: 'Call of Duty',      patterns: [/call of duty/i] },
+  { name: 'Far Cry',           patterns: [/far cry/i] },
+  { name: 'Tomb Raider',       patterns: [/tomb raider/i] },
+  { name: 'BioShock',          patterns: [/bioshock/i] },
+  { name: 'Mass Effect',       patterns: [/mass effect/i] },
+  { name: 'Dragon Age',        patterns: [/dragon age/i] },
+  { name: 'Zelda',             patterns: [/zelda/i] },
+  { name: 'Mario',             patterns: [/\bmario\b/i] },
+  { name: 'Horizon',           patterns: [/\bhorizon\b/i] },
+  { name: 'Crash Bandicoot',   patterns: [/crash bandicoot/i] },
+  { name: 'Borderlands',       patterns: [/borderlands/i] },
+  { name: 'Pokémon',           patterns: [/pok[eé]mon/i] },
+  { name: 'Sonic',             patterns: [/\bsonic\b/i] },
+  { name: 'Need for Speed',    patterns: [/need for speed/i] },
+  { name: 'FIFA / FC',         patterns: [/\bfifa\b/i, /\bfc \d+\b/i] },
+  { name: 'Forza',             patterns: [/\bforza\b/i] },
+  { name: 'Mortal Kombat',     patterns: [/mortal kombat/i] },
+  { name: 'Street Fighter',    patterns: [/street fighter/i] },
+  { name: 'Devil May Cry',     patterns: [/devil may cry/i] },
+  { name: 'Yakuza / Like a Dragon', patterns: [/\byakuza\b/i, /like a dragon/i] },
+  { name: 'Persona',           patterns: [/\bpersona\b/i] },
+  { name: 'Fallout',           patterns: [/\bfallout\b/i] },
+  { name: 'Elder Scrolls',     patterns: [/elder scrolls/i, /\bskyrim\b/i, /\boblivion\b/i] },
+  { name: 'DOOM',              patterns: [/\bdoom\b/i] },
+  { name: 'Wolfenstein',       patterns: [/wolfenstein/i] },
+  { name: 'Hitman',            patterns: [/\bhitman\b/i] },
+  { name: 'Dishonored',        patterns: [/dishonored/i] },
+  { name: 'Mafia',             patterns: [/\bmafia\b/i] },
+  { name: 'Watch Dogs',        patterns: [/watch dogs/i] },
+  { name: 'Prince of Persia',  patterns: [/prince of persia/i] },
+  { name: 'Alan Wake',         patterns: [/alan wake/i] },
+  { name: 'Cyberpunk',         patterns: [/cyberpunk/i] },
+  { name: 'Hogwarts / Harry Potter', patterns: [/hogwarts/i, /harry potter/i] },
+  { name: 'Deus Ex',           patterns: [/deus ex/i] },
+  { name: 'Splinter Cell',     patterns: [/splinter cell/i] },
+  { name: 'Outlast',     patterns: [/outlast/i] },
+  { name: 'Half life',     patterns: [/half life/i] },
+  { name: 'The Legend Of Zelda',     patterns: [/the legend of zelda/i] },
+  { name: 'Hotline Miami',     patterns: [/hotline miami/i] },
+
+
+];
+
 let PLAYERS       = {};
 let playerOrder   = [];
 let currentPlayer = '';
@@ -70,13 +128,14 @@ let currentSort   = 'date';
 const coverCache  = JSON.parse(localStorage.getItem('cover_cache') || '{}');
 
 const PAGE_SIZE     = 10;
-const playerPages   = {};  
-const playerCovIdx  = {};  
-const observers     = {};  
+const playerPages   = {};
+const playerCovIdx  = {};
+const observers     = {};
 const playerConsole = {};
 const playerGenre   = {};
 const playerRebuildGen = {};
-let hideDLC = false;
+let hideDLC   = false;
+let viewMode  = 'sagas';
 
 function fetchGvizJSONP(gid) {
   return new Promise((resolve, reject) => {
@@ -439,6 +498,36 @@ function sortGames(games, by) {
   return copy;
 }
 
+function groupBySaga(games) {
+  const groups  = {};
+  const orphans = [];
+
+  for (const game of games) {
+    let matched = false;
+    for (const saga of SAGAS) {
+      if (saga.patterns.some(p => p.test(game.name))) {
+        if (!groups[saga.name]) groups[saga.name] = [];
+        groups[saga.name].push(game);
+        matched = true;
+        break;
+      }
+    }
+    if (!matched) orphans.push(game);
+  }
+
+  // sagas com só 1 jogo vão pra Outros
+  for (const [name, sagaGames] of Object.entries(groups)) {
+    if (sagaGames.length < 2) {
+      orphans.push(...sagaGames);
+      delete groups[name];
+    }
+  }
+
+  const sorted = Object.entries(groups).sort((a, b) => b[1].length - a[1].length);
+  if (orphans.length > 0) sorted.push(['Outros', orphans]);
+  return sorted;
+}
+
 function diffClass(d) {
   if (!d) return '';
   const clean = d.replace(/[^A-Za-z]/g, '').toUpperCase();
@@ -531,8 +620,31 @@ function renderSortBar(key) {
         <button class="sort-btn ${currentSort === 'date'  ? 'active' : ''}" data-sort="date">Data</button>
         <button class="sort-btn ${currentSort === 'score' ? 'active' : ''}" data-sort="score">Nota</button>
         <button class="sort-btn ${currentSort === 'name'  ? 'active' : ''}" data-sort="name">Nome</button>
+        <button class="sort-btn sagas-toggle ${viewMode === 'grid' ? 'active' : ''}">Ver Todos</button>
       </div>
     </div>`;
+}
+
+function renderSagasView(key) {
+  const player  = PLAYERS[key];
+  const filtered = getFilteredGames(key);
+  const grouped  = groupBySaga(filtered);
+
+  if (grouped.length === 0) {
+    return `<div class="grid"><div class="empty"><div class="empty-icon">🎮</div><p>Nenhuma saga encontrada.</p></div></div>`;
+  }
+
+  return `<div class="sagas-view">${
+    grouped.map(([sagaName, games]) => `
+      <div class="saga-row">
+        <div class="saga-header">
+          <span class="saga-title">${esc(sagaName)}</span>
+          <span class="saga-count" style="color:${player.color}">${games.length}</span>
+        </div>
+        <div class="saga-track">${games.map(g => renderCard(g, player.color, key)).join('')}</div>
+      </div>`
+    ).join('')
+  }</div>`;
 }
 
 function updatePlayerBadge(key) {
@@ -599,6 +711,12 @@ function buildSections() {
         ${renderSortBar(key)}
         <div class="grid"><div class="empty"><div class="empty-icon">🎮</div>
         <p>Nenhum jogo encontrado para este console.</p></div></div>`;
+    } else if (viewMode === 'sagas') {
+      playerPages[key] = filtered.length;
+      section.innerHTML = `
+        ${renderStats(player.games, player)}
+        ${renderSortBar(key)}
+        ${renderSagasView(key)}`;
     } else {
       const firstBatch = filtered.slice(0, PAGE_SIZE);
       playerPages[key] = Math.min(PAGE_SIZE, filtered.length);
@@ -613,8 +731,12 @@ function buildSections() {
 
   buildStatsSection(container);
 
-  loadPendingCovers(currentPlayer);
-  setupObserver(currentPlayer);
+  if (viewMode === 'sagas') {
+    playerOrder.forEach(k => loadPendingCovers(k));
+  } else {
+    loadPendingCovers(currentPlayer);
+    setupObserver(currentPlayer);
+  }
   bindSortButtons();
 }
 
@@ -889,8 +1011,15 @@ document.getElementById('player-sections').addEventListener('click', e => {
 
 function bindSortButtons() {
   document.querySelectorAll('.sort-btn').forEach(btn => {
+    if (btn.classList.contains('dlc-toggle') || btn.classList.contains('sagas-toggle')) return;
     btn.addEventListener('click', () => {
       currentSort = btn.dataset.sort;
+      buildSections();
+    });
+  });
+  document.querySelectorAll('.sagas-toggle').forEach(btn => {
+    btn.addEventListener('click', () => {
+      viewMode = viewMode === 'sagas' ? 'grid' : 'sagas';
       buildSections();
     });
   });
