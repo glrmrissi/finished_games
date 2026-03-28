@@ -750,33 +750,51 @@ function buildStatsSection(container) {
   const maxCount = Math.max(...allStats.map(s => s.count), 1);
   const maxHours = Math.max(...allStats.map(s => s.totalH || 0), 1);
 
-  function pieChart(slices, title) {
+  function donutChart(slices, title) {
     const total = slices.reduce((s, d) => s + (d.value || 0), 0);
     if (total === 0) return '';
-    const cx = 90, cy = 90, r = 75;
-    let angle = -Math.PI / 2;
-    const paths = slices.filter(d => d.value > 0).map(d => {
-      const sweep = (d.value / total) * 2 * Math.PI;
-      const x1 = cx + r * Math.cos(angle);
-      const y1 = cy + r * Math.sin(angle);
-      angle += sweep;
-      const x2 = cx + r * Math.cos(angle);
-      const y2 = cy + r * Math.sin(angle);
-      const large = sweep > Math.PI ? 1 : 0;
-      return `<path d="M${cx},${cy} L${x1.toFixed(2)},${y1.toFixed(2)} A${r},${r} 0 ${large},1 ${x2.toFixed(2)},${y2.toFixed(2)} Z" fill="${d.color}" opacity="0.85"><title>${esc(d.label)}: ${d.fmt} (${Math.round(d.value/total*100)}%)</title></path>`;
+    const cx = 90, cy = 90, r = 66;
+    const circumference = 2 * Math.PI * r;
+    const gap = 5;
+    let cumulAngle = 0;
+
+    const segments = slices.filter(d => d.value > 0).map(d => {
+      const pct   = d.value / total;
+      const dash  = Math.max(0, pct * circumference - gap);
+      const seg   = `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none"
+        stroke="${d.color}" stroke-width="20" stroke-linecap="butt"
+        stroke-dasharray="${dash.toFixed(2)} ${(circumference - dash).toFixed(2)}"
+        stroke-dashoffset="${(circumference / 4).toFixed(2)}"
+        transform="rotate(${cumulAngle} ${cx} ${cy})">
+        <title>${esc(d.label)}: ${d.fmt} (${Math.round(pct * 100)}%)</title>
+      </circle>`;
+      cumulAngle += pct * 360;
+      return seg;
     }).join('');
-    const legend = slices.filter(d => d.value > 0).map(d =>
-      `<div class="pie-legend-row">
+
+    const legend = slices.filter(d => d.value > 0).map(d => {
+      const pct = Math.round(d.value / total * 100);
+      return `<div class="pie-legend-row">
         <span class="pie-dot" style="background:${d.color}"></span>
         <span class="pie-lbl">${esc(d.label)}</span>
-        <span class="pie-pct">${Math.round(d.value / total * 100)}%</span>
-      </div>`
-    ).join('');
+        <span class="pie-val">${d.fmt}</span>
+        <span class="pie-pct">${pct}%</span>
+      </div>`;
+    }).join('');
+
     return `
       <div class="pie-wrap">
         <div class="pie-title">${title}</div>
-        <svg viewBox="0 0 180 180" class="pie-svg">${paths}</svg>
-        <div class="pie-legend">${legend}</div>
+        <div class="pie-body">
+          <div class="pie-svg-wrap">
+            <svg viewBox="0 0 180 180" class="pie-svg">
+              ${segments}
+              <text x="${cx}" y="${cy - 6}" text-anchor="middle" class="donut-center-val">${total}</text>
+              <text x="${cx}" y="${cy + 14}" text-anchor="middle" class="donut-center-lbl">TOTAL</text>
+            </svg>
+          </div>
+          <div class="pie-legend">${legend}</div>
+        </div>
       </div>`;
   }
 
@@ -792,9 +810,9 @@ function buildStatsSection(container) {
               <div class="stats-bar-row">
                 <div class="stats-bar-name" style="color:${s.player.color}">${s.player.name}</div>
                 <div class="stats-bar-track">
-                  <div class="stats-bar-fill" style="width:${pct}%;background:${s.player.color}"></div>
+                  <div class="stats-bar-fill" style="width:${pct}%;background:linear-gradient(90deg,${s.player.color}99,${s.player.color})"></div>
                 </div>
-                <div class="stats-bar-val">${formatValue(s)}</div>
+                <div class="stats-bar-val" style="color:${s.player.color}">${formatValue(s)}</div>
               </div>`;
           }).join('')}
         </div>
@@ -805,7 +823,7 @@ function buildStatsSection(container) {
     <div class="stats-page">
       <div class="stats-player-cards">
         ${allStats.map(s => `
-          <div class="stats-pcard">
+          <div class="stats-pcard" style="--pcard-accent:${s.player.color}">
             <div class="stats-pcard-name" style="color:${s.player.color}">${s.player.name}</div>
             <div class="stats-pcard-row">
               <span class="stats-pcard-val" style="color:${s.player.color}">${s.count}</span>
@@ -823,8 +841,8 @@ function buildStatsSection(container) {
       </div>
 
       <div class="pie-charts-row">
-        ${pieChart(allStats.map(s => ({ label: s.player.name, value: s.count, fmt: s.count, color: s.player.color })), 'Jogos Zerados')}
-        ${pieChart(allStats.map(s => ({ label: s.player.name, value: s.totalH || 0, fmt: s.totalH !== null ? s.totalH + 'h' : '—', color: s.player.color })), 'Horas Jogadas')}
+        ${donutChart(allStats.map(s => ({ label: s.player.name, value: s.count, fmt: s.count, color: s.player.color })), 'Jogos Zerados')}
+        ${donutChart(allStats.map(s => ({ label: s.player.name, value: s.totalH || 0, fmt: s.totalH !== null ? s.totalH + 'h' : '—', color: s.player.color })), 'Horas Jogadas')}
       </div>
 
       ${barSection('Jogos Zerados', s => s.count, s => s.count, maxCount)}

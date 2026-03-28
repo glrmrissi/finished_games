@@ -1068,6 +1068,17 @@
     padding: 20px 16px;
     text-align: center;
     transition: border-color .25s, transform .2s;
+    position: relative;
+    overflow: hidden;
+}
+
+.stats-pcard::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    background: var(--pcard-accent, var(--border));
+    border-radius: 12px 12px 0 0;
 }
 
 .stats-pcard-name {
@@ -1105,43 +1116,75 @@
 
 .pie-charts-row {
     display: flex;
-    gap: 40px;
+    gap: 32px;
     justify-content: center;
     flex-wrap: wrap;
-    margin-bottom: 48px;
+    margin-bottom: 52px;
 }
 
 .pie-wrap {
     display: flex;
     flex-direction: column;
-    align-items: center;
-    gap: 12px;
+    align-items: flex-start;
+    gap: 14px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 20px 24px;
+    min-width: 300px;
 }
 
 .pie-title {
     font-family: 'Rajdhani', sans-serif;
-    font-size: .8rem;
+    font-size: .78rem;
     font-weight: 700;
     letter-spacing: 2.5px;
     text-transform: uppercase;
     color: var(--muted);
 }
 
+.pie-body {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    width: 100%;
+}
+
+.pie-svg-wrap {
+    flex-shrink: 0;
+}
+
 .pie-svg {
-    width: 160px;
-    height: 160px;
-    filter: drop-shadow(0 4px 16px rgba(0,0,0,.5));
+    width: 150px;
+    height: 150px;
+    filter: drop-shadow(0 4px 20px rgba(0,0,0,.6));
+}
+
+.donut-center-val {
+    font-family: 'Orbitron', monospace;
+    font-size: 28px;
+    font-weight: 700;
+    fill: var(--text);
+}
+
+.donut-center-lbl {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 2px;
+    fill: var(--muted);
 }
 
 .pie-legend {
     display: flex;
     flex-direction: column;
-    gap: 6px;
-    min-width: 120px;
+    gap: 8px;
+    flex: 1;
 }
 
 .pie-legend-row {
-    display: flex;
+    display: grid;
+    grid-template-columns: 9px 1fr auto auto;
     align-items: center;
     gap: 8px;
     font-size: .78rem;
@@ -1158,13 +1201,20 @@
     font-family: 'Rajdhani', sans-serif;
     font-weight: 600;
     letter-spacing: .5px;
-    flex: 1;
+}
+
+.pie-val {
+    font-family: 'Orbitron', monospace;
+    font-size: .68rem;
+    color: var(--text);
 }
 
 .pie-pct {
     font-family: 'Orbitron', monospace;
-    font-size: .68rem;
+    font-size: .65rem;
     color: var(--muted);
+    min-width: 32px;
+    text-align: right;
 }
 
 .stats-chart-section {
@@ -1185,10 +1235,10 @@
 
 .stats-bar-row {
     display: grid;
-    grid-template-columns: 72px 1fr 60px;
+    grid-template-columns: 80px 1fr 64px;
     align-items: center;
-    gap: 12px;
-    margin-bottom: 10px;
+    gap: 14px;
+    margin-bottom: 14px;
 }
 
 .stats-bar-name {
@@ -1202,25 +1252,24 @@
 
 .stats-bar-track {
     background: var(--card2);
-    border-radius: 4px;
-    height: 22px;
+    border-radius: 6px;
+    height: 30px;
     overflow: hidden;
     border: 1px solid var(--border);
 }
 
 .stats-bar-fill {
     height: 100%;
-    border-radius: 4px;
-    transition: width .7s cubic-bezier(.4,0,.2,1);
-    opacity: .8;
-    min-width: 2px;
+    border-radius: 6px;
+    transition: width .8s cubic-bezier(.4,0,.2,1);
+    min-width: 3px;
 }
 
 .stats-bar-val {
     font-family: 'Orbitron', monospace;
-    font-size: .75rem;
+    font-size: .78rem;
     font-weight: 700;
-    color: var(--text);
+    text-align: right;
 }
 
 @media (max-width: 600px) {
