@@ -1281,3 +1281,222 @@
     .stats-bar-name { font-size: .75rem; }
     .stats-bar-val { font-size: .68rem; }
 }
+
+/* ── Stats section block ─────────────────────────── */
+.stats-section-block {
+    margin-bottom: 52px;
+}
+
+/* ── Heatmap ─────────────────────────────────────── */
+.hm-container {
+    display: flex;
+    flex-direction: column;
+    gap: 28px;
+}
+
+.hm-player {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px 20px;
+}
+
+.hm-name {
+    font-family: 'Rajdhani', sans-serif;
+    font-weight: 700;
+    font-size: .8rem;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 12px;
+}
+
+.hm-months {
+    display: grid;
+    grid-template-columns: 36px repeat(12, 1fr);
+    gap: 4px;
+    margin-bottom: 5px;
+}
+
+.hm-months span {
+    font-size: .58rem;
+    color: var(--muted);
+    text-align: center;
+    letter-spacing: .5px;
+    text-transform: uppercase;
+}
+
+.hm-row {
+    display: grid;
+    grid-template-columns: 36px repeat(12, 1fr);
+    gap: 4px;
+    margin-bottom: 4px;
+}
+
+.hm-year {
+    font-family: 'Orbitron', monospace;
+    font-size: .58rem;
+    color: var(--muted);
+    text-align: right;
+    padding-right: 6px;
+    align-self: center;
+}
+
+.hm-cell {
+    height: 22px;
+    border-radius: 4px;
+    background: var(--card2);
+    border: 1px solid var(--border);
+    cursor: default;
+    transition: transform .15s, filter .15s;
+}
+
+.hm-cell.active:hover {
+    transform: scale(1.25);
+    filter: brightness(1.3);
+    z-index: 1;
+    position: relative;
+}
+
+/* ── Jogos em Comum ──────────────────────────────── */
+.common-wrap {
+    overflow-x: auto;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+}
+
+.common-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.common-table thead tr {
+    border-bottom: 1px solid var(--border);
+}
+
+.common-table th {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: .72rem;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    padding: 10px 14px;
+    text-align: center;
+}
+
+.common-table th:first-child {
+    text-align: left;
+    color: var(--muted);
+}
+
+.common-table tbody tr {
+    border-bottom: 1px solid var(--border);
+    transition: background .15s;
+}
+
+.common-table tbody tr:last-child {
+    border-bottom: none;
+}
+
+.common-table tbody tr:hover {
+    background: var(--card2);
+}
+
+.common-name {
+    font-family: 'Rajdhani', sans-serif;
+    font-weight: 600;
+    font-size: .88rem;
+    padding: 10px 14px;
+    color: var(--text);
+}
+
+.common-score {
+    font-family: 'Orbitron', monospace;
+    font-size: .78rem;
+    font-weight: 700;
+    text-align: center;
+    padding: 10px 14px;
+}
+
+.common-empty {
+    text-align: center;
+    color: var(--muted);
+    font-size: .78rem;
+    padding: 10px 14px;
+}
+
+/* ── Conquistas ──────────────────────────────────── */
+.achiev-player {
+    margin-bottom: 24px;
+}
+
+.achiev-player-name {
+    font-family: 'Rajdhani', sans-serif;
+    font-weight: 700;
+    font-size: .8rem;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.achiev-count {
+    font-family: 'Orbitron', monospace;
+    font-size: .65rem;
+    color: var(--muted);
+    font-weight: 400;
+}
+
+.achiev-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.achiev {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    border-radius: 20px;
+    border: 1px solid var(--border);
+    cursor: default;
+    transition: transform .2s, border-color .2s;
+    user-select: none;
+}
+
+.achiev.earned {
+    background: var(--card2);
+    border-color: rgba(255,255,255,.12);
+}
+
+.achiev.earned:hover {
+    transform: translateY(-2px);
+    border-color: rgba(255,255,255,.25);
+}
+
+.achiev.locked {
+    opacity: .28;
+    filter: grayscale(1);
+}
+
+.achiev-icon {
+    font-size: .95rem;
+    line-height: 1;
+}
+
+.achiev-name {
+    font-family: 'Rajdhani', sans-serif;
+    font-weight: 600;
+    font-size: .78rem;
+    letter-spacing: .5px;
+    color: var(--text);
+}
+
+@media (max-width: 600px) {
+    .pie-wrap { min-width: unset; width: 100%; }
+    .pie-body { flex-direction: column; align-items: center; }
+    .hm-cell { height: 16px; }
+    .hm-months span, .hm-year { font-size: .5rem; }
+}
