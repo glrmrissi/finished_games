@@ -742,18 +742,6 @@ function buildSections() {
   bindSortButtons();
 }
 
-const ACHIEVEMENTS = [
-  { id: 'marathon',      name: 'Maratonista',    desc: 'Zerou um jogo com 50h ou mais',             check: g => g.some(x => { const h = parseHours(x.time); return h !== null && h >= 50; }) },
-  { id: 'speedrun',      name: 'Speedrunner',    desc: 'Zerou um jogo em menos de 3h',              check: g => g.some(x => { const h = parseHours(x.time); return h !== null && h > 0 && h < 3; }) },
-  { id: 'perfect',       name: 'Crítico',         desc: 'Deu nota 10 para 3 jogos ou mais',          check: g => g.filter(x => x.score === 10).length >= 3 },
-  { id: 'hardcore',      name: 'Hardcore',        desc: 'Zerou um jogo com dificuldade S ou S+',     check: g => g.some(x => /^s/i.test(x.difficulty)) },
-  { id: 'completionist', name: 'Completionista',  desc: 'Zerou uma saga inteira (3+ jogos)',          check: g => groupBySaga(g).some(([n, gs]) => n !== 'Outros' && gs.length >= 3) },
-  { id: 'prolific',      name: 'Prolífico',       desc: 'Zerou 30 jogos ou mais',                    check: g => g.length >= 30 },
-  { id: 'centurion',     name: 'Centurião',       desc: 'Mais de 1000h no total',                    check: g => g.map(x => parseHours(x.time) || 0).reduce((a,b)=>a+b,0) >= 1000 },
-  { id: 'variety',       name: 'Eclético',        desc: 'Zerou jogos em 5 consoles diferentes',      check: g => new Set(g.map(x => x.console).filter(Boolean)).size >= 5 },
-  { id: 'reviewer',      name: 'Crítico Literário', desc: 'Escreveu resenha em 5 jogos ou mais',    check: g => g.filter(x => x.review && x.review.trim().length > 10).length >= 5 },
-  { id: 'lowscore',      name: 'Implacável',      desc: 'Deu nota abaixo de 5 para 3 jogos',        check: g => g.filter(x => x.score > 0 && x.score < 5).length >= 3 },
-];
 
 function buildHeatmapSection() {
   const MONTHS = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
@@ -843,27 +831,6 @@ function buildCommonGamesSection() {
   </div>`;
 }
 
-function buildAchievementsSection() {
-  const blocks = playerOrder.map(k => {
-    const player = PLAYERS[k];
-    const games  = player.games;
-    const earned    = ACHIEVEMENTS.filter(a => a.check(games));
-    const notEarned = ACHIEVEMENTS.filter(a => !a.check(games));
-    const badges = [
-      ...earned.map(a => `<div class="achiev earned" title="${a.desc}"><span class="achiev-name">${a.name}</span></div>`),
-      ...notEarned.map(a => `<div class="achiev locked" title="${a.desc} (bloqueado)"><span class="achiev-icon">🔒</span><span class="achiev-name">${a.name}</span></div>`),
-    ].join('');
-    return `<div class="achiev-player">
-      <div class="achiev-player-name" style="color:${player.color}">${player.name} <span class="achiev-count">${earned.length}/${ACHIEVEMENTS.length}</span></div>
-      <div class="achiev-list">${badges}</div>
-    </div>`;
-  }).join('');
-
-  return `<div class="stats-section-block">
-    <div class="stats-chart-title">Conquistas</div>
-    ${blocks}
-  </div>`;
-}
 
 function buildStatsSection(container) {
   const allStats = playerOrder.map(k => {
@@ -974,7 +941,6 @@ function buildStatsSection(container) {
       ${barSection('Horas Jogadas', s => s.totalH || 0, s => s.totalH !== null ? s.totalH + 'h' : '—', maxHours)}
       ${barSection('Nota Média', s => parseFloat(s.avgScore) || 0, s => s.avgScore, 10)}
       ${buildCommonGamesSection()}
-      ${buildAchievementsSection()}
       ${buildHeatmapSection()}
     </div>`;
 
