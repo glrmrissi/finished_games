@@ -985,8 +985,6 @@ function buildStatsSection(container) {
   container.appendChild(section);
 }
 
-const sleep = ms => new Promise(r => setTimeout(r, ms));
-
 function makePlaceholder(name) {
   const div = document.createElement('div');
   div.className = 'cover-placeholder';
@@ -994,48 +992,67 @@ function makePlaceholder(name) {
   return div;
 }
 
+function applyCover(key, game, imgUrl, rebuildGen) {
+  if ((playerRebuildGen[key] || 0) !== rebuildGen) return;
+  const cardId = `card-${game.name.replace(/\W/g, '_')}`;
+  const target = document.getElementById(`cov-${cardId}`);
+  if (!target) return;
+
+  if (imgUrl) {
+    const img = document.createElement('img');
+    img.className = 'cover';
+    img.alt = game.name;
+    img.decoding = 'async';
+
+    img.onerror = async () => {
+      img.onerror = null;
+      const query = SEARCH_OVERRIDES[game.name.toLowerCase()] || game.name;
+      const wiki  = await fetchWikiCover(game.name);
+      if (wiki) {
+        coverCache[query] = wiki;
+        localStorage.setItem('cover_cache', JSON.stringify(coverCache));
+        img.src = wiki;
+      } else {
+        coverCache[query] = null;
+        localStorage.setItem('cover_cache', JSON.stringify(coverCache));
+        img.replaceWith(makePlaceholder(game.name));
+      }
+    };
+
+    img.src = imgUrl;
+    target.replaceWith(img);
+  } else {
+    target.replaceWith(makePlaceholder(game.name));
+  }
+}
+
 async function loadCoversFrom(key, from, to, rebuildGen) {
   const player = PLAYERS[key];
   if (!player) return;
-  const sorted = getFilteredGames(key);
+  const sorted  = getFilteredGames(key);
+  const uncached = [];
 
+  // Aplica covers em cache imediatamente, sem await
   for (let i = from; i < Math.min(to, sorted.length); i++) {
     if ((playerRebuildGen[key] || 0) !== rebuildGen) return;
-    const game   = sorted[i];
-    const cardId = `card-${game.name.replace(/\W/g, '_')}`;
-    const target = document.getElementById(`cov-${cardId}`);
-    if (!target) continue;
-
-    const imgUrl = await fetchCover(game);
-
-    if (imgUrl) {
-      const img = document.createElement('img');
-      img.className = 'cover';
-      img.alt = game.name;
-      img.loading = 'lazy';
-
-      img.onerror = async () => {
-        img.onerror = null;
-        const query = SEARCH_OVERRIDES[game.name.toLowerCase()] || game.name;
-        const wiki  = await fetchWikiCover(game.name);
-        if (wiki) {
-          coverCache[query] = wiki;
-          localStorage.setItem('cover_cache', JSON.stringify(coverCache));
-          img.src = wiki;
-        } else {
-          coverCache[query] = null;
-          localStorage.setItem('cover_cache', JSON.stringify(coverCache));
-          img.replaceWith(makePlaceholder(game.name));
-        }
-      };
-
-      img.src = imgUrl;
-      target.replaceWith(img);
+    const game  = sorted[i];
+    const query = SEARCH_OVERRIDES[game.name.toLowerCase()] || game.name;
+    if (coverCache[query] !== undefined) {
+      applyCover(key, game, coverCache[query], rebuildGen);
     } else {
-      target.replaceWith(makePlaceholder(game.name));
+      uncached.push(game);
     }
+  }
 
-    if (i < to - 1) await sleep(150);
+  // Busca covers sem cache em lotes paralelos
+  const CONCURRENCY = 4;
+  for (let j = 0; j < uncached.length; j += CONCURRENCY) {
+    if ((playerRebuildGen[key] || 0) !== rebuildGen) return;
+    await Promise.all(
+      uncached.slice(j, j + CONCURRENCY).map(game =>
+        fetchCover(game).then(url => applyCover(key, game, url, rebuildGen))
+      )
+    );
   }
 }
 

@@ -185,12 +185,18 @@
         opacity: 1;
     }
 
+    @keyframes coverIn {
+        from { opacity: 0; }
+        to   { opacity: 1; }
+    }
+
     .cover {
         width: 100%;
         aspect-ratio: 3/4;
         object-fit: cover;
         display: block;
         background: var(--card2);
+        animation: coverIn .3s ease;
     }
 
     .cover-placeholder {
